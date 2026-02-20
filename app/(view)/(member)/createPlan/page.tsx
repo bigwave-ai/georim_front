@@ -12,10 +12,10 @@ import LoadingModal from '@/app/components/libs/modals/modal-loading'
 /*
  * 01. 구분      : Page 컴포넌트
  * 02. 타입      : Client Component
- * 03. 업무구분  : 멤버권한 - 생산 계획 생성
+ * 03. 업무구분   : 멤버권한 - 생산 계획 생성
  * 04. 설명      : 주차별 물동 계획 기반 생산 계획 생성 페이지
- * 05. 작성일자  : 2026.02.19
- * 06. 작성자    : 이우창
+ * 05. 작성일자   : 2026.02.19
+ * 06. 작성자     : 이우창
  */
 
 type PlanRow = {
@@ -36,21 +36,41 @@ export default function CreatePlanPage() {
   const PAGE_SIZE = 10
   const ALLOWED_EXTENSIONS = ['csv', 'xlsx']
 
+  // 기준일 선택
   const [selectedDate, setSelectedDate] = useState<Dayjs | null>(null)
+
+  // 테이블 페이지네이션
   const [page, setPage] = useState(1)
 
+  // 현재 데이터 출처(없음/기존 불러오기/새 데이터 업로드)
   const [dataSource, setDataSource] = useState<DataSourceType>('none')
-  const [uploadMessage, setUploadMessage] = useState('엑셀형식 물동 계획 파일을 업로드')
+
+  // 업로드 상태 문구 및 파일명
+  const [uploadMessage, setUploadMessage] = useState('엑셀형식 물동 계획을 업로드')
   const [uploadedFileName, setUploadedFileName] = useState('')
+
+  // 실제 렌더링되는 테이블 데이터
   const [planRows, setPlanRows] = useState<PlanRow[]>([])
 
+  // 카드 등장 애니메이션 트리거용 key
+  const [planCardRenderKey, setPlanCardRenderKey] = useState(0)
+
+  // 생산 계획 생성 모달 흐름 상태
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [isLoadingModalOpen, setIsLoadingModalOpen] = useState(false)
+  const [isGenerationLoadingModalOpen, setIsGenerationLoadingModalOpen] = useState(false)
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false)
 
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const generationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // 데이터 불러오기/업로드 로딩 모달 상태
+  const [isDataLoadingModalOpen, setIsDataLoadingModalOpen] = useState(false)
 
+  // 숨김 파일 input ref
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  // 타이머 ref (언마운트 시 clear)
+  const generationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dataLoadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // 목업 데이터 기본 row
   const BASE_ROW: Omit<PlanRow, 'id'> = {
     division: 'Macbook LCD (AR Film)',
     customerName: '엘앤에프',
@@ -70,6 +90,7 @@ export default function CreatePlanPage() {
     []
   )
 
+  // 페이지네이션 계산
   const totalPages = Math.max(1, Math.ceil(planRows.length / PAGE_SIZE))
   const safePage = Math.min(Math.max(1, page), totalPages)
 
@@ -83,6 +104,7 @@ export default function CreatePlanPage() {
     [totalPages]
   )
 
+  // 화면 표시용 값
   const selectedDateText = selectedDate?.format('YYYY-MM-DD') ?? '-'
   const isPlanVisible = dataSource !== 'none' && planRows.length > 0
   const sourceLabel = dataSource === 'load' ? '기존 데이터' : '새로운 데이터'
@@ -97,21 +119,55 @@ export default function CreatePlanPage() {
     }
   }
 
+  const clearDataLoadingTimer = () => {
+    if (dataLoadingTimerRef.current) {
+      clearTimeout(dataLoadingTimerRef.current)
+      dataLoadingTimerRef.current = null
+    }
+  }
+
+  // 로딩 종료 후 실제 데이터 반영
+  const applyLoadedPlanData = (source: DataSourceType, fileName = '') => {
+    setDataSource(source)
+    setUploadedFileName(fileName)
+    setPlanRows(MOCK_ROWS)
+    setPage(1)
+
+    // 카드가 "새로 등장"하도록 key 갱신
+    setPlanCardRenderKey((prev) => prev + 1)
+  }
+
+  // 데이터 로딩 시작(기존 불러오기/업로드 공통)
+  const startDataLoading = (source: DataSourceType, fileName = '') => {
+    // 로딩 중에는 카드를 잠깐 숨겼다가 다시 표시(등장 애니메이션 목적)
+    setDataSource('none')
+    setPlanRows([])
+    setPage(1)
+
+    setIsDataLoadingModalOpen(true)
+    clearDataLoadingTimer()
+
+    dataLoadingTimerRef.current = setTimeout(() => {
+      setIsDataLoadingModalOpen(false)
+      applyLoadedPlanData(source, fileName)
+    }, 900)
+  }
+
   const handlePrev = () => setPage((prev) => Math.max(1, prev - 1))
   const handleNext = () => setPage((prev) => Math.min(totalPages, prev + 1))
 
+  // 기존 데이터 불러오기
   const handleLoadClick = () => {
     if (!selectedDate) return
-    setDataSource('load')
-    setUploadedFileName('')
-    setPlanRows(MOCK_ROWS)
-    setPage(1)
+    startDataLoading('load')
   }
 
+  // 파일 선택창 열기
   const handleUploadClick = () => {
     fileInputRef.current?.click()
   }
 
+  // 새 데이터 업로드
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -119,7 +175,7 @@ export default function CreatePlanPage() {
     const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
     const isAllowed = ALLOWED_EXTENSIONS.includes(ext)
 
-    // 같은 파일 재선택 허용
+    // 같은 파일 재선택 가능하도록 초기화
     event.target.value = ''
 
     if (!isAllowed) {
@@ -127,11 +183,8 @@ export default function CreatePlanPage() {
       return
     }
 
-    setUploadedFileName(file.name)
-    setUploadMessage(`${file.name} 업로드 완료`)
-    setDataSource('upload')
-    setPlanRows(MOCK_ROWS)
-    setPage(1)
+    setUploadMessage(`${file.name} 확인 완료`)
+    startDataLoading('upload', file.name)
   }
 
   const handleOpenCreateModal = () => {
@@ -142,14 +195,14 @@ export default function CreatePlanPage() {
     setIsCreateModalOpen(false)
   }
 
-  // 1) 생성 확인 모달 -> 2) 로딩 모달 -> 3) 완료 모달
+  // 1) 생성 확인 모달 -> 2) 생성 로딩 모달 -> 3) 완료 모달
   const handleConfirmCreatePlan = () => {
     setIsCreateModalOpen(false)
-    setIsLoadingModalOpen(true)
+    setIsGenerationLoadingModalOpen(true)
 
     clearGenerationTimer()
     generationTimerRef.current = setTimeout(() => {
-      setIsLoadingModalOpen(false)
+      setIsGenerationLoadingModalOpen(false)
       setIsCompleteModalOpen(true)
     }, 1600)
   }
@@ -165,9 +218,11 @@ export default function CreatePlanPage() {
     if (page > totalPages) setPage(totalPages)
   }, [page, totalPages])
 
+  // 언마운트 시 타이머 정리
   useEffect(() => {
     return () => {
       clearGenerationTimer()
+      clearDataLoadingTimer()
     }
   }, [])
 
@@ -193,13 +248,14 @@ export default function CreatePlanPage() {
               value={selectedDate}
               onChange={setSelectedDate}
               width={150}
+              tone="plan"
             />
 
             <button
               type="button"
               className={`${mmc.plan_actionBtn} ${mmc.plan_actionBtnLoad}`}
               onClick={handleLoadClick}
-              disabled={!selectedDate}
+              disabled={!selectedDate || isDataLoadingModalOpen}
             >
               불러오기
             </button>
@@ -223,6 +279,7 @@ export default function CreatePlanPage() {
               type="button"
               className={`${mmc.plan_actionBtn} ${mmc.plan_actionBtnUpload}`}
               onClick={handleUploadClick}
+              disabled={isDataLoadingModalOpen}
             >
               업로드
             </button>
@@ -231,7 +288,10 @@ export default function CreatePlanPage() {
       </section>
 
       {isPlanVisible && (
-        <section className={mmc.plan_tableCard}>
+        <section
+          key={planCardRenderKey}
+          className={`${mmc.plan_tableCard} ${mmc.plan_tableCardEnter}`}
+        >
           <header className={mmc.plan_tableHead}>
             <div className={mmc.plan_tableHeadLeft}>
               <h3>주차별 물동 계획</h3>
@@ -316,6 +376,13 @@ export default function CreatePlanPage() {
         </section>
       )}
 
+      {/* 데이터 로딩 모달(기존 데이터 불러오기 / 업로드 공통) */}
+      <LoadingModal
+        open={isDataLoadingModalOpen}
+        message="데이터를 불러오고 있습니다."
+        subMessage="잠시만 기다려주세요."
+      />
+
       {/* 1) 생성 확인 모달 */}
       <CommonModal
         open={isCreateModalOpen}
@@ -329,7 +396,7 @@ export default function CreatePlanPage() {
 
       {/* 2) 생성 중 로딩 모달 */}
       <LoadingModal
-        open={isLoadingModalOpen}
+        open={isGenerationLoadingModalOpen}
         message="생산계획을 생성중입니다."
         subMessage="잠시만 기다려주세요."
       />

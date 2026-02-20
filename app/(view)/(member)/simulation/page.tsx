@@ -24,48 +24,61 @@ type MachineOption = {
   label: string
 }
 
+/** 호기 선택 칩 목록 */
 const MACHINE_OPTIONS: MachineOption[] = [
-  { id: 'm1', label: '고속톰슨 1호기' },
-  { id: 'm3', label: '고속톰슨 3호기' },
-  { id: 'm4', label: '고속톰슨 4호기' },
-  { id: 'm5', label: '고속톰슨 5호기' },
-  { id: 'm71', label: '고속톰슨 7-1호기' },
-  { id: 'm72a', label: '고속톰슨 7-2호기' },
-  { id: 'm72b', label: '고속톰슨 7-2호기' },
-  { id: 'm8', label: '고속톰슨 8호기' },
-  { id: 'm9', label: '고속톰슨 9호기' },
-  { id: 'm10', label: '고속톰슨 10호기' },
-  { id: 'm12', label: '고속톰슨 12호기' },
-  { id: 'm13', label: '고속톰슨 13호기' },
-  { id: 'm14', label: '고속톰슨 14호기' },
+  { id: 'm1', label: '고속물손 1호기' },
+  { id: 'm3', label: '고속물손 3호기' },
+  { id: 'm4', label: '고속물손 4호기' },
+  { id: 'm5', label: '고속물손 5호기' },
+  { id: 'm71', label: '고속물손 7-1호기' },
+  { id: 'm72a', label: '고속물손 7-2호기' },
+  { id: 'm72b', label: '고속물손 7-2호기' },
+  { id: 'm8', label: '고속물손 8호기' },
+  { id: 'm9', label: '고속물손 9호기' },
+  { id: 'm10', label: '고속물손 10호기' },
+  { id: 'm12', label: '고속물손 12호기' },
+  { id: 'm13', label: '고속물손 13호기' },
+  { id: 'm14', label: '고속물손 14호기' },
 ]
 
+/** 초기값: 아무것도 선택하지 않음 */
 const DEFAULT_SELECTED_MACHINES: string[] = []
 
 export default function SimulationPage() {
   /******************** 변수영역 ********************/
+  /** 사용자 입력 상태 */
   const [selectedMachineIds, setSelectedMachineIds] = useState<string[]>(DEFAULT_SELECTED_MACHINES)
   const [estimatedMinutes, setEstimatedMinutes] = useState('')
   const [shippingDate, setShippingDate] = useState<Dayjs | null>(null)
 
+  /** 시뮬레이션 결과 상태 */
   const [resultType, setResultType] = useState<SimulationResult>('none')
+
+  /** 번갈아 결과 표시를 위한 토글 (true: 다음은 성공 / false: 다음은 실패) */
   const [nextSuccessResult, setNextSuccessResult] = useState(true)
 
+  /** 모달 상태 */
   const [isLoadingModalOpen, setIsLoadingModalOpen] = useState(false)
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false)
 
+  /** 로딩 타이머 ref (언마운트 시 clear 필요) */
   const loadingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  /** 선택된 호기 객체 목록 */
   const selectedMachines = useMemo(
     () => MACHINE_OPTIONS.filter((option) => selectedMachineIds.includes(option.id)),
     [selectedMachineIds]
   )
 
+  /** 실패 사유 문구 출력용: 선택 호기 텍스트 */
   const selectedMachineText = selectedMachines.map((item) => item.label).join(', ')
+
+  /** 결과 카드 출력용 포맷 값 */
   const shippingDateText = shippingDate ? shippingDate.format('YYYY-MM-DD') : '-'
   const estimatedMinuteValue = Number(estimatedMinutes || '0')
   const isEstimatedValid = Number.isFinite(estimatedMinuteValue) && estimatedMinuteValue > 0
 
+  /** 시뮬레이션 시작 가능 여부 */
   const canStartSimulation =
     selectedMachineIds.length > 0 &&
     isEstimatedValid &&
@@ -73,6 +86,7 @@ export default function SimulationPage() {
     !isLoadingModalOpen
 
   /******************** 함수영역 ********************/
+  /** 로딩 타이머 정리 */
   const clearLoadingTimer = () => {
     if (loadingTimerRef.current) {
       clearTimeout(loadingTimerRef.current)
@@ -80,17 +94,24 @@ export default function SimulationPage() {
     }
   }
 
+  /** 호기 칩 토글 선택/해제 */
   const handleToggleMachine = (machineId: string) => {
     setSelectedMachineIds((prev) =>
       prev.includes(machineId) ? prev.filter((id) => id !== machineId) : [...prev, machineId]
     )
   }
 
+  /** 예상 소요 시간: 숫자만 허용 */
   const handleEstimatedMinutesChange = (event: ChangeEvent<HTMLInputElement>) => {
     const onlyNumber = event.target.value.replace(/\D/g, '')
     setEstimatedMinutes(onlyNumber)
   }
 
+  /**
+   * 시뮬레이션 시작
+   * - 유효성 통과 시 로딩 모달 표시
+   * - 1.6초 후 성공/실패를 번갈아 결과로 표시
+   */
   const handleStartSimulation = () => {
     if (!canStartSimulation) return
 
@@ -105,19 +126,17 @@ export default function SimulationPage() {
     }, 1600)
   }
 
-  const handleOpenRequestModal = () => {
-    setIsRequestModalOpen(true)
-  }
+  /** 생산계획 반영 요청 모달 열기/닫기 */
+  const handleOpenRequestModal = () => setIsRequestModalOpen(true)
+  const handleCloseRequestModal = () => setIsRequestModalOpen(false)
 
-  const handleCloseRequestModal = () => {
-    setIsRequestModalOpen(false)
-  }
-
+  /** 반영 요청 확인 처리 (현재는 UI 확인만) */
   const handleConfirmRequestModal = () => {
     setIsRequestModalOpen(false)
   }
 
   /******************** 수행영역 ********************/
+  /** 페이지 이탈/언마운트 시 타이머 정리 */
   useEffect(() => {
     return () => {
       clearLoadingTimer()
@@ -126,11 +145,13 @@ export default function SimulationPage() {
 
   return (
     <div className={mmc.simulation_root}>
+      {/* 페이지 헤더 */}
       <section className={mmc.simulation_pageHead}>
         <h1>개발 샘플 시뮬레이션</h1>
         <p>생산계획에 대하여 시뮬레이션하여 결과를 확인 및 반영할 수 있습니다.</p>
       </section>
 
+      {/* 입력 카드 */}
       <section className={mmc.simulation_formCard}>
         <header className={mmc.simulation_cardHead}>
           <div className={mmc.simulation_cardTitleWrap}>
@@ -140,6 +161,7 @@ export default function SimulationPage() {
         </header>
 
         <div className={mmc.simulation_inputRows}>
+          {/* 호기 선택 */}
           <div className={mmc.simulation_row}>
             <div className={mmc.simulation_rowLabel}>호기 정보 선택</div>
             <div className={mmc.simulation_rowContent}>
@@ -157,6 +179,7 @@ export default function SimulationPage() {
             </div>
           </div>
 
+          {/* 예상 소요 시간 */}
           <div className={mmc.simulation_row}>
             <div className={mmc.simulation_rowLabel}>예상 소요 시간(분)</div>
             <div className={mmc.simulation_rowContent}>
@@ -165,13 +188,14 @@ export default function SimulationPage() {
                 value={estimatedMinutes}
                 onChange={handleEstimatedMinutesChange}
                 inputMode="numeric"
-                placeholder="분 단위 입력"
+                placeholder="예상 소요 시간 입력"
                 aria-label="예상 소요 시간(분)"
               />
               <span className={mmc.simulation_help}>*모델 교체 시간을 포함하여 입력해주세요.</span>
             </div>
           </div>
 
+          {/* 출하일자 */}
           <div className={mmc.simulation_row}>
             <div className={mmc.simulation_rowLabel}>출하 일자</div>
             <div className={mmc.simulation_rowContent}>
@@ -187,6 +211,7 @@ export default function SimulationPage() {
           </div>
         </div>
 
+        {/* 시작 버튼 */}
         <div className={mmc.simulation_startWrap}>
           <button
             type="button"
@@ -199,6 +224,7 @@ export default function SimulationPage() {
         </div>
       </section>
 
+      {/* 결과 카드 (none이 아닐 때만 표시) */}
       {resultType !== 'none' && (
         <section className={mmc.simulation_resultCard}>
           <header className={mmc.simulation_resultHead}>
@@ -289,6 +315,7 @@ export default function SimulationPage() {
             </div>
           </div>
 
+          {/* 성공일 때만 하단 액션 버튼 표시 */}
           {resultType === 'success' && (
             <div className={mmc.simulation_resultActions}>
               <button
@@ -310,11 +337,13 @@ export default function SimulationPage() {
         </section>
       )}
 
+      {/* 로딩 모달 */}
       <LoadingModal
         open={isLoadingModalOpen}
         message="시뮬레이션을 진행중입니다. 조금만 기다려주세요."
       />
 
+      {/* 반영 요청 확인 모달 */}
       <CommonModal
         open={isRequestModalOpen}
         title="생산계획 반영 요청"
