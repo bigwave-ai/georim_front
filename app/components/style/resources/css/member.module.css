@@ -3809,6 +3809,42 @@
   letter-spacing: -0.5px;
 }
 
+.simulation_resultSampleTabs{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.simulation_resultSampleTab{
+  border: 1px solid #c7d8e8;
+  border-radius: 999px;
+  height: 34px;
+  padding: 0 14px;
+  background: #fff;
+  color: #315173;
+  font-family: Pretendard;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  cursor: pointer;
+  transition: filter 0.16s ease, transform 0.08s ease;
+}
+
+.simulation_resultSampleTab:hover{
+  filter: brightness(0.98);
+}
+
+.simulation_resultSampleTab:active{
+  transform: translateY(1px);
+}
+
+.simulation_resultSampleTabActive{
+  border-color: #2f79b9;
+  background: #e9f4ff;
+  color: #1d5f98;
+}
 
 /* 반응형 */
 @media (max-width: 1360px){
@@ -3944,6 +3980,16 @@
     height: 40px;
     font-size: 14px;
   }
+
+  .simulation_resultSampleTabs{
+    gap: 6px;
+  }
+
+  .simulation_resultSampleTab{
+    height: 32px;
+    font-size: 12px;
+    padding: 0 12px;
+  }  
 }
 
 /* Simulation 폰트 강제 */
